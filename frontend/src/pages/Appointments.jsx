@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import NewAppointmentModal from '../components/NewAppointmentModal';
+import '../styles/Appointments.css';
 
 function Appointments() {
   const [appointments, setAppointments] = useState([]);
@@ -16,6 +17,12 @@ function Appointments() {
     if (userData) {
       const user = JSON.parse(userData);
       setUserRole(user.role);
+      
+      // Si es doctor, redirigir al dashboard
+      if (user.role === 'doctor') {
+        navigate('/doctor/dashboard');
+        return;
+      }
     } else {
       // Si no hay usuario, redirigir al login
       navigate('/login');
@@ -25,7 +32,11 @@ function Appointments() {
   const loadAppointments = async () => {
     try {
       const response = await axios.get('http://localhost:5000/api/appointments');
-      setAppointments(response.data);
+      // Ordenar citas por fecha, las más recientes primero
+      const sortedAppointments = response.data.sort((a, b) => 
+        new Date(a.date).getTime() - new Date(b.date).getTime()
+      );
+      setAppointments(sortedAppointments);
     } catch (err) {
       setError('Error al cargar las citas');
     }
@@ -51,15 +62,12 @@ function Appointments() {
     handleStatusChange(id, 'cancelled');
   };
 
-  const handleCompleteAppointment = async (id) => {
-    if (!window.confirm('¿Confirmar que la cita fue completada?')) return;
-    handleStatusChange(id, 'completed');
-  };
-
   const getStatusText = (status) => {
     switch (status) {
-      case 'scheduled':
-        return 'Programada';
+      case 'pending':
+        return 'Pendiente';
+      case 'confirmed':
+        return 'Confirmada';
       case 'completed':
         return 'Completada';
       case 'cancelled':
@@ -81,7 +89,22 @@ function Appointments() {
 
   return (
     <div className="appointments-container">
-      <h2>{userRole === 'doctor' ? 'Mis Consultas' : 'Mis Citas'}</h2>
+      <div className="appointments-header">
+        <h2>Mis Citas Médicas</h2>
+        <div className="nav-buttons">
+          <button onClick={() => setIsModalOpen(true)}>
+            + Nueva Cita
+          </button>
+          <button onClick={() => {
+            localStorage.removeItem('user');
+            localStorage.removeItem('token');
+            navigate('/login');
+          }}>
+            Cerrar Sesión
+          </button>
+        </div>
+      </div>
+
       <div className="appointments-list">
         {error && (
           <div className="error-message">
@@ -90,15 +113,18 @@ function Appointments() {
         )}
 
         {appointments.length === 0 ? (
-          <p>No hay citas programadas</p>
+          <div className="no-appointments">
+            <p>No tienes citas programadas</p>
+            <p>¡Programa tu primera cita haciendo click en "Nueva Cita"!</p>
+          </div>
         ) : (
           <table className="appointments-table">
             <thead>
               <tr>
                 <th>Fecha</th>
                 <th>Hora</th>
-                <th>{userRole === 'doctor' ? 'Paciente' : 'Doctor'}</th>
-                {userRole === 'patient' && <th>Especialidad</th>}
+                <th>Doctor</th>
+                <th>Especialidad</th>
                 <th>Motivo</th>
                 <th>Estado</th>
                 <th>Acciones</th>
@@ -106,37 +132,26 @@ function Appointments() {
             </thead>
             <tbody>
               {appointments.map((appointment) => (
-                <tr key={appointment.id}>
+                <tr key={appointment._id}>
                   <td>{formatDate(appointment.date)}</td>
                   <td>{appointment.time}</td>
                   <td>
-                    {userRole === 'doctor' 
-                      ? appointment.patient.name 
-                      : `Dr. ${appointment.doctor.name}`}
+                    Dr. {appointment.doctor?.user?.name || 'No asignado'}
                   </td>
-                  {userRole === 'patient' && (
-                    <td>{appointment.doctor.specialty}</td>
-                  )}
-                  <td>{appointment.reason}</td>
+                  <td>{appointment.doctor?.speciality || 'No especificada'}</td>
+                  <td>{appointment.symptoms}</td>
                   <td>
                     <span className={`status-badge ${appointment.status}`}>
                       {getStatusText(appointment.status)}
                     </span>
                   </td>
                   <td>
-                    {appointment.status === 'scheduled' && (
+                    {appointment.status !== 'cancelled' && 
+                     appointment.status !== 'completed' && (
                       <div className="appointment-status-controls">
-                        {userRole === 'doctor' && (
-                          <button 
-                            className="status-button complete"
-                            onClick={() => handleCompleteAppointment(appointment.id)}
-                          >
-                            Completar
-                          </button>
-                        )}
                         <button 
                           className="status-button cancel"
-                          onClick={() => handleCancelAppointment(appointment.id)}
+                          onClick={() => handleCancelAppointment(appointment._id)}
                         >
                           Cancelar
                         </button>
@@ -149,30 +164,14 @@ function Appointments() {
           </table>
         )}
       </div>
-      <div className="nav-buttons">
-        {userRole === 'patient' && (
-          <button onClick={() => setIsModalOpen(true)}>
-            Nueva Cita
-          </button>
-        )}
-        <button onClick={() => {
-          localStorage.removeItem('user');
-          localStorage.removeItem('token');
-          navigate('/login');
-        }}>
-          Cerrar Sesión
-        </button>
-      </div>
 
-      {userRole === 'patient' && (
-        <NewAppointmentModal 
-          isOpen={isModalOpen}
-          onClose={() => {
-            setIsModalOpen(false);
-            loadAppointments();
-          }}
-        />
-      )}
+      <NewAppointmentModal 
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          loadAppointments();
+        }}
+      />
     </div>
   );
 }
