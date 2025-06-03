@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { endpoints } from '../config/api';
 
 function Register() {
   const [formData, setFormData] = useState({
@@ -24,18 +25,30 @@ function Register() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    
     try {
       const dataToSend = { ...formData };
       if (formData.role === 'patient') {
         // Si es paciente, eliminamos los campos de doctor
         delete dataToSend.specialty;
         delete dataToSend.licenseNumber;
+      } else if (!dataToSend.specialty || !dataToSend.licenseNumber) {
+        setError('Por favor complete todos los campos requeridos');
+        return;
       }
 
-      await axios.post('http://localhost:5000/api/auth/register', dataToSend);
+      const response = await axios.post(endpoints.auth.register, dataToSend);
+      console.log('Registro exitoso:', response.data);
+      
+      // Redirigir al login
       navigate('/login');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Error en el registro');
+    } catch (error) {
+      console.error('Error en el registro:', error);
+      setError(
+        error.response?.data?.message || 
+        'Error en el registro. Por favor intente nuevamente.'
+      );
     }
   };
 
@@ -53,6 +66,8 @@ function Register() {
             value={formData.name}
             onChange={handleChange}
             required
+            minLength={3}
+            placeholder="Ingrese su nombre completo"
           />
         </div>
 
@@ -64,6 +79,7 @@ function Register() {
             value={formData.email}
             onChange={handleChange}
             required
+            placeholder="ejemplo@correo.com"
           />
         </div>
 
@@ -75,7 +91,8 @@ function Register() {
             value={formData.password}
             onChange={handleChange}
             required
-            minLength="6"
+            minLength={6}
+            placeholder="Mínimo 6 caracteres"
           />
         </div>
 
@@ -128,6 +145,8 @@ function Register() {
                 onChange={handleChange}
                 required={formData.role === 'doctor'}
                 placeholder="Ej: MED-12345"
+                pattern="^[A-Z]+-\d{5}$"
+                title="Formato: XXX-12345"
               />
             </div>
           </>
@@ -136,9 +155,9 @@ function Register() {
         <button type="submit">Registrarse</button>
       </form>
 
-      <button onClick={() => navigate('/login')} className="secondary-button">
-        ¿Ya tienes cuenta? Inicia sesión
-      </button>
+      <p>
+        ¿Ya tienes cuenta? <a href="/login">Inicia sesión</a>
+      </p>
     </div>
   );
 }

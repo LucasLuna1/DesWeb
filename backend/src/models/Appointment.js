@@ -8,7 +8,7 @@ const appointmentSchema = new mongoose.Schema({
   },
   doctor: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: 'Doctor',
     required: true
   },
   date: {
@@ -19,22 +19,47 @@ const appointmentSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  reason: {
+  status: {
+    type: String,
+    enum: ['pending', 'confirmed', 'cancelled', 'completed'],
+    default: 'pending'
+  },
+  type: {
+    type: String,
+    enum: ['first-visit', 'follow-up', 'consultation', 'emergency'],
+    required: true
+  },
+  symptoms: {
     type: String,
     required: true
   },
-  status: {
+  diagnosis: {
     type: String,
-    enum: ['scheduled', 'completed', 'cancelled'],
-    default: 'scheduled'
+    default: ''
   },
+  prescription: [{
+    medicine: {
+      type: String,
+      required: true
+    },
+    dosage: String,
+    frequency: String,
+    duration: String
+  }],
   notes: {
     type: String
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
+  fee: {
+    type: Number,
+    required: true
+  },
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'completed', 'refunded'],
+    default: 'pending'
   }
+}, {
+  timestamps: true
 });
 
 // Index for querying appointments

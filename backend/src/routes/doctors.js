@@ -1,75 +1,84 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const db = require('../config/db');
+const Doctor = require('../models/Doctor');
+const User = require('../models/User');
 
-// Get all doctors
+// GET /api/doctors - Get all doctors
 router.get('/', auth, async (req, res) => {
-  try {
-    const [doctors] = await db.query(`
-      SELECT id, name, email, role 
-      FROM users 
-      WHERE role = 'doctor' 
-      ORDER BY name ASC
-    `);
-    res.json(doctors);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
-  }
+    try {
+        console.log('Getting all doctors...');
+        console.log('Authenticated user:', {
+            id: req.user._id,
+            email: req.user.email,
+            role: req.user.role
+        });
+        
+        const doctors = await Doctor.find()
+            .populate('user', 'name email')
+            .lean()
+            .exec();
+            
+        console.log('Doctors found:', doctors);
+        res.json(doctors);
+    } catch (error) {
+        console.error('Error in GET /api/doctors:', error);
+        res.status(500).json({ 
+            message: 'Server error', 
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
 });
 
-// Get doctor by ID
+// GET /api/doctors/:id - Get a specific doctor
 router.get('/:id', auth, async (req, res) => {
-  try {
-    const [doctors] = await db.query(`
-      SELECT id, name, email, role 
-      FROM users 
-      WHERE id = ? AND role = 'doctor'
-    `, [req.params.id]);
-    
-    if (doctors.length === 0) {
-      return res.status(404).json({ message: 'Doctor not found' });
+    try {
+        const doctor = await Doctor.findById(req.params.id)
+            .populate('user', 'name email')
+            .lean()
+            .exec();
+            
+        if (!doctor) {
+            return res.status(404).json({ message: 'Doctor not found' });
+        }
+        res.json(doctor);
+    } catch (error) {
+        console.error('Error in GET /api/doctors/:id:', error);
+        res.status(500).json({ 
+            message: 'Server error', 
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
-    
-    res.json(doctors[0]);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
-  }
 });
 
-// Get doctor's schedule
-router.get('/:id/schedule', auth, async (req, res) => {
-  try {
-    const [doctors] = await db.query(
-      'SELECT id FROM users WHERE id = ? AND role = "doctor"',
-      [req.params.id]
-    );
+// POST /api/doctors - Create a new doctor
+router.post('/', auth, async (req, res) => {
+    try {
+        console.log('Creating new doctor...');
+        console.log('Request body:', req.body);
+        
+        const doctor = new Doctor({
+            user: req.user._id,
+            ...req.body
+        });
 
-    if (doctors.length === 0) {
-      return res.status(404).json({ message: 'Doctor not found' });
+        console.log('Doctor to save:', doctor);
+        await doctor.save();
+        
+        const savedDoctor = await doctor.populate('user', 'name email');
+        console.log('Saved doctor:', savedDoctor);
+        
+        res.status(201).json(savedDoctor);
+    } catch (error) {
+        console.error('Error in POST /api/doctors:', error);
+        res.status(500).json({ 
+            message: 'Server error', 
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
-
-    // Get all appointments for the doctor for the next 7 days
-    const today = new Date().toISOString().split('T')[0];
-    const nextWeek = new Date();
-    nextWeek.setDate(nextWeek.getDate() + 7);
-    const nextWeekDate = nextWeek.toISOString().split('T')[0];
-
-    const [appointments] = await db.query(`
-      SELECT * FROM appointments 
-      WHERE doctor_id = ? 
-      AND date BETWEEN ? AND ?
-      AND status != 'cancelled'
-      ORDER BY date ASC, time ASC
-    `, [req.params.id, today, nextWeekDate]);
-
-    res.json(appointments);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
-  }
 });
 
 module.exports = router; 

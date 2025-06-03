@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import PropTypes from 'prop-types';
 
+const API_URL = 'http://localhost:3000/api';
+
 const AuthContext = createContext();
 
 export const useAuth = () => {
@@ -35,7 +37,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/login', {
+      const response = await axios.post(`${API_URL}/auth/login`, {
         email,
         password,
       });
@@ -45,21 +47,25 @@ export const AuthProvider = ({ children }) => {
       setToken(newToken);
       setUser(userData);
       setIsAuthenticated(true);
+      return response.data;
     } catch (error) {
+      console.error('Login error:', error.response?.data || error.message);
       throw error;
     }
   };
 
   const register = async (userData) => {
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/register', userData);
+      const response = await axios.post(`${API_URL}/auth/register`, userData);
       const { token: newToken, user: newUser } = response.data;
       localStorage.setItem('token', newToken);
       localStorage.setItem('user', JSON.stringify(newUser));
       setToken(newToken);
       setUser(newUser);
       setIsAuthenticated(true);
+      return response.data;
     } catch (error) {
+      console.error('Register error:', error.response?.data || error.message);
       throw error;
     }
   };
