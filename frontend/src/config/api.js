@@ -1,4 +1,21 @@
-export const API_URL = 'http://localhost:3000/api';
+import axios from 'axios';
+
+// Usar la variable de entorno o un valor por defecto
+export const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+// Configurar interceptor global para el token
+axios.interceptors.request.use(
+    config => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    error => {
+        return Promise.reject(error);
+    }
+);
 
 // Helper function to build API endpoints
 export const endpoints = {
@@ -10,7 +27,7 @@ export const endpoints = {
     appointments: {
         list: `${API_URL}/appointments`,
         create: `${API_URL}/appointments`,
-        available: (doctorId, date) => `${API_URL}/appointments/available?doctorId=${doctorId}&date=${date}`,
+        available: (doctorId, date) => `${API_URL}/appointments/available-slots?doctorId=${doctorId}&date=${date}`,
         updateStatus: (id) => `${API_URL}/appointments/${id}/status`
     },
     doctors: {

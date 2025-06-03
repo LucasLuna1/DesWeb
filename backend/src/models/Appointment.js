@@ -48,15 +48,6 @@ const appointmentSchema = new mongoose.Schema({
   }],
   notes: {
     type: String
-  },
-  fee: {
-    type: Number,
-    required: true
-  },
-  paymentStatus: {
-    type: String,
-    enum: ['pending', 'completed', 'refunded'],
-    default: 'pending'
   }
 }, {
   timestamps: true

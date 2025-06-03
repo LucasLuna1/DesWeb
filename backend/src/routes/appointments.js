@@ -9,19 +9,47 @@ const User = require('../models/User');
 // Get all appointments for the logged-in user
 router.get('/', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).lean();
-    
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'Usuario no autenticado' });
+    }
+
     let appointments;
-    if (user.role === 'doctor') {
-      appointments = await Appointment.find({ doctor: req.user.userId })
-        .populate('patient', 'name email')
-        .populate('doctor', 'name email specialization')
+    if (req.user.role === 'doctor') {
+      // Buscar el doctor asociado al usuario
+      const doctor = await Doctor.findOne({ user: req.user._id });
+      if (!doctor) {
+        return res.status(404).json({ message: 'Perfil de doctor no encontrado' });
+      }
+
+      appointments = await Appointment.find({ doctor: doctor._id })
+        .populate({
+          path: 'patient',
+          select: 'name email'
+        })
+        .populate({
+          path: 'doctor',
+          select: 'speciality consultationFee',
+          populate: {
+            path: 'user',
+            select: 'name email'
+          }
+        })
         .sort({ date: 1, time: 1 })
         .lean();
     } else {
-      appointments = await Appointment.find({ patient: req.user.userId })
-        .populate('doctor', 'name email specialization')
-        .populate('patient', 'name email')
+      appointments = await Appointment.find({ patient: req.user._id })
+        .populate({
+          path: 'doctor',
+          select: 'speciality consultationFee',
+          populate: {
+            path: 'user',
+            select: 'name email'
+          }
+        })
+        .populate({
+          path: 'patient',
+          select: 'name email'
+        })
         .sort({ date: 1, time: 1 })
         .lean();
     }
@@ -30,7 +58,7 @@ router.get('/', auth, async (req, res) => {
   } catch (error) {
     console.error('Error getting appointments:', error);
     res.status(500).json({ 
-      message: 'Server error',
+      message: 'Error del servidor',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -42,7 +70,7 @@ router.get('/available-slots', auth, async (req, res) => {
     const { doctorId, date } = req.query;
     
     if (!doctorId || !date) {
-      return res.status(400).json({ message: 'Doctor ID and date are required' });
+      return res.status(400).json({ message: 'Se requiere ID del doctor y fecha' });
     }
 
     // Define available time slots (9 AM to 5 PM)
@@ -74,7 +102,7 @@ router.get('/available-slots', auth, async (req, res) => {
   } catch (error) {
     console.error('Error getting available slots:', error);
     res.status(500).json({ 
-      message: 'Server error',
+      message: 'Error del servidor',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -84,43 +112,45 @@ router.get('/available-slots', auth, async (req, res) => {
 router.post('/',
   [
     auth,
-    body('doctorId').notEmpty().withMessage('Doctor ID is required'),
-    body('date').isISO8601().withMessage('Valid date is required'),
-    body('time').matches(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/).withMessage('Valid time is required'),
-    body('type').isIn(['first-visit', 'follow-up', 'consultation', 'emergency']).withMessage('Valid appointment type is required'),
-    body('symptoms').notEmpty().withMessage('Symptoms are required'),
-    body('fee').isNumeric().withMessage('Valid fee is required')
+    body('doctorId').notEmpty().withMessage('Se requiere ID del doctor'),
+    body('date').isISO8601().withMessage('Se requiere una fecha válida'),
+    body('time').matches(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/).withMessage('Se requiere una hora válida'),
+    body('type').isIn(['first-visit', 'follow-up', 'consultation', 'emergency']).withMessage('Tipo de cita no válido'),
+    body('symptoms').notEmpty().withMessage('Se requieren los síntomas')
   ],
   async (req, res) => {
     try {
+      if (!req.user || !req.user._id) {
+        return res.status(401).json({ message: 'Usuario no autenticado' });
+      }
+
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { doctorId, date, time, type, symptoms, fee } = req.body;
+      const { doctorId, date, time, type, symptoms } = req.body;
 
       // Check if doctor exists
       const doctor = await Doctor.findById(doctorId);
       if (!doctor) {
-        return res.status(400).json({ message: 'Invalid doctor' });
+        return res.status(400).json({ message: 'Doctor no válido' });
       }
 
       // Check if time slot is available
       const isAvailable = await Appointment.isTimeSlotAvailable(doctorId, new Date(date), time);
       if (!isAvailable) {
-        return res.status(400).json({ message: 'Time slot is not available' });
+        return res.status(400).json({ message: 'Horario no disponible' });
       }
 
       // Create appointment
       const appointment = new Appointment({
-        patient: req.user.userId,
+        patient: req.user._id,
         doctor: doctorId,
         date: new Date(date),
         time,
         type,
         symptoms,
-        fee,
         status: 'pending'
       });
 
@@ -128,15 +158,25 @@ router.post('/',
 
       // Populate the response
       const populatedAppointment = await Appointment.findById(appointment._id)
-        .populate('doctor', 'name email specialization')
-        .populate('patient', 'name email')
+        .populate({
+          path: 'doctor',
+          select: 'speciality',
+          populate: {
+            path: 'user',
+            select: 'name email'
+          }
+        })
+        .populate({
+          path: 'patient',
+          select: 'name email'
+        })
         .lean();
 
       res.status(201).json(populatedAppointment);
     } catch (error) {
       console.error('Error creating appointment:', error);
       res.status(500).json({ 
-        message: 'Server error',
+        message: 'Error del servidor',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
@@ -147,10 +187,14 @@ router.post('/',
 router.patch('/:id/status',
   [
     auth,
-    body('status').isIn(['pending', 'confirmed', 'cancelled', 'completed']).withMessage('Invalid status')
+    body('status').isIn(['pending', 'confirmed', 'cancelled', 'completed']).withMessage('Estado no válido')
   ],
   async (req, res) => {
     try {
+      if (!req.user || !req.user._id) {
+        return res.status(401).json({ message: 'Usuario no autenticado' });
+      }
+
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({ errors: errors.array() });
@@ -158,19 +202,30 @@ router.patch('/:id/status',
 
       // Get appointment and check authorization
       const appointment = await Appointment.findById(req.params.id)
-        .populate('doctor', 'name email specialization')
-        .populate('patient', 'name email');
+        .populate({
+          path: 'doctor',
+          select: 'speciality consultationFee',
+          populate: {
+            path: 'user',
+            select: 'name email'
+          }
+        })
+        .populate({
+          path: 'patient',
+          select: 'name email'
+        });
 
       if (!appointment) {
-        return res.status(404).json({ message: 'Appointment not found' });
+        return res.status(404).json({ message: 'Cita no encontrada' });
       }
 
       // Check authorization (only doctor or patient can update)
-      const isDoctor = appointment.doctor._id.toString() === req.user.userId.toString();
-      const isPatient = appointment.patient._id.toString() === req.user.userId.toString();
+      const doctor = await Doctor.findOne({ user: req.user._id });
+      const isDoctor = doctor && doctor._id.toString() === appointment.doctor._id.toString();
+      const isPatient = req.user._id.toString() === appointment.patient._id.toString();
       
       if (!isDoctor && !isPatient) {
-        return res.status(403).json({ message: 'Not authorized' });
+        return res.status(403).json({ message: 'No autorizado' });
       }
 
       // Update status
@@ -181,7 +236,7 @@ router.patch('/:id/status',
     } catch (error) {
       console.error('Error updating appointment status:', error);
       res.status(500).json({ 
-        message: 'Server error',
+        message: 'Error del servidor',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
