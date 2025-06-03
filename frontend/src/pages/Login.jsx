@@ -1,120 +1,78 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Paper,
-  Typography,
-  TextField,
-  Button,
-  Alert,
-} from '@mui/material';
-import { useFormik } from 'formik';
-import * as yup from 'yup';
-import { useAuth } from '../contexts/AuthContext';
-
-const validationSchema = yup.object({
-  email: yup
-    .string()
-    .email('Ingrese un email válido')
-    .required('El email es requerido'),
-  password: yup
-    .string()
-    .min(6, 'La contraseña debe tener al menos 6 caracteres')
-    .required('La contraseña es requerida'),
-});
+import axios from 'axios';
 
 function Login() {
-  const { login } = useAuth();
-  const navigate = useNavigate();
-  const [error, setError] = useState('');
-
-  const formik = useFormik({
-    initialValues: {
-      email: '',
-      password: '',
-    },
-    validationSchema: validationSchema,
-    onSubmit: async (values) => {
-      try {
-        await login(values.email, values.password);
-        navigate('/appointments');
-      } catch (err) {
-        setError(err.response?.data?.message || 'Error al iniciar sesión');
-      }
-    },
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
   });
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await axios.post('http://localhost:5000/api/auth/login', formData);
+      const { token, user } = response.data;
+      
+      // Guardar token y datos del usuario
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      // Configurar el token para futuras peticiones
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      navigate('/appointments');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al iniciar sesión');
+    }
+  };
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '80vh',
-      }}
-    >
-      <Paper
-        elevation={3}
-        sx={{
-          p: 4,
-          width: '100%',
-          maxWidth: 400,
-        }}
-      >
-        <Typography variant="h5" component="h1" align="center" gutterBottom>
-          Iniciar Sesión
-        </Typography>
-
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-
-        <form onSubmit={formik.handleSubmit}>
-          <TextField
-            fullWidth
-            id="email"
+    <div className="login-container">
+      <h2>Iniciar Sesión</h2>
+      {error && (
+        <div className="error-message">
+          {error}
+        </div>
+      )}
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label>Email:</label>
+          <input
+            type="email"
             name="email"
-            label="Email"
-            value={formik.values.email}
-            onChange={formik.handleChange}
-            error={formik.touched.email && Boolean(formik.errors.email)}
-            helperText={formik.touched.email && formik.errors.email}
-            margin="normal"
+            value={formData.email}
+            onChange={handleChange}
+            required
           />
-
-          <TextField
-            fullWidth
-            id="password"
-            name="password"
-            label="Contraseña"
+        </div>
+        <div>
+          <label>Contraseña:</label>
+          <input
             type="password"
-            value={formik.values.password}
-            onChange={formik.handleChange}
-            error={formik.touched.password && Boolean(formik.errors.password)}
-            helperText={formik.touched.password && formik.errors.password}
-            margin="normal"
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            required
           />
-
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            sx={{ mt: 3, mb: 2 }}
-          >
-            Iniciar Sesión
-          </Button>
-        </form>
-
-        <Typography variant="body2" align="center">
-          ¿No tienes una cuenta?{' '}
-          <Button color="primary" onClick={() => navigate('/register')}>
-            Regístrate aquí
-          </Button>
-        </Typography>
-      </Paper>
-    </Box>
+        </div>
+        <button type="submit">
+          Iniciar Sesión
+        </button>
+      </form>
+      <button onClick={() => navigate('/register')} className="secondary-button">
+        ¿No tienes cuenta? Regístrate
+      </button>
+    </div>
   );
 }
 
