@@ -2,10 +2,10 @@
   "name": "sistema-reservas-medicas",
   "version": "1.0.0",
   "description": "Sistema de gestión de citas médicas",
-  "main": "src/presentacion/app.js",
+  "main": "backend/src/app.js",
   "scripts": {
-    "start": "node src/presentacion/app.js",
-    "dev": "nodemon src/presentacion/app.js",
+    "start": "cd backend && node src/app.js",
+    "dev": "cd backend && nodemon src/app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
