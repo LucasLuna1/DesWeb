@@ -1,0 +1,40 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, migracion ]
+  pull_request:
+    branches: [ main, migracion ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Clonar el repositorio
+      uses: actions/checkout@v3
+
+    - name: Configurar Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Instalar dependencias del backend
+      run: |
+        cd backend
+        npm install
+
+    - name: Ejecutar tests del backend
+      run: |
+        cd backend
+        npm test
+
+    - name: Instalar dependencias del frontend
+      run: |
+        cd frontend
+        npm install
+
+    - name: Ejecutar tests del frontend
+      run: |
+        cd frontend
+        npm test
