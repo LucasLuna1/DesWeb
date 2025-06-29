@@ -36,11 +36,11 @@
                                         </td>
                                         <td>
                                             <% if (cita.estado === 'pendiente') { %>
-                                                <form action="/citas/<%= cita._id %>/estado" method="POST" style="display: inline;">
+                                                <form action="/dashboard/citas/<%= cita._id %>/estado" method="POST" style="display: inline;">
                                                     <input type="hidden" name="estado" value="confirmada">
                                                     <button type="submit" class="btn btn-success btn-sm">Confirmar</button>
                                                 </form>
-                                                <form action="/citas/<%= cita._id %>/estado" method="POST" style="display: inline;">
+                                                <form action="/dashboard/citas/<%= cita._id %>/estado" method="POST" style="display: inline;">
                                                     <input type="hidden" name="estado" value="cancelada">
                                                     <button type="submit" class="btn btn-danger btn-sm">Cancelar</button>
                                                 </form>
