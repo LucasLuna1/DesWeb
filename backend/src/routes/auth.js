@@ -11,7 +11,6 @@ router.post('/registro', async (req, res) => {
     try {
         const { nombre, email, password, rol, especialidad } = req.body;
         const hashedPassword = await bcrypt.hash(password, 10);
-        
         const usuario = new Usuario({
             nombre,
             email,
@@ -36,10 +35,12 @@ router.post('/login', async (req, res) => {
         const { email, password } = req.body;
         const usuario = await Usuario.findOne({ email });
         
+        // Valida usuario
         if (!usuario || !(await bcrypt.compare(password, usuario.password))) {
             return res.status(401).render('login', { error: 'Credenciales inválidas' });
         }
-        
+
+        // Guarda los datos del usuario en la sesión
         req.session.userId = usuario._id;
         req.session.rol = usuario.rol;
         res.redirect('/dashboard');
@@ -49,8 +50,9 @@ router.post('/login', async (req, res) => {
 });
 
 router.get('/logout', (req, res) => {
-    req.session.destroy();
+    // Elimina datos de su sesion 
+    req.session.destroy(); 
     res.redirect('/');
 });
 
-module.exports = router; 
+module.exports = router;
