@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, migracion ]
+    branches: [ main, feature/migracion ]
   pull_request:
-    branches: [ main, migracion ]
+    branches: [ main, feature/migracion ]
 
 jobs:
   build-and-test:
